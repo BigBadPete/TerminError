@@ -1,0 +1,50 @@
+/* ===================================================================== */
+/*  EXMONMSG2  -  Exemple 2 : handler GLOBAL + RCVMSG                     */
+/* --------------------------------------------------------------------- */
+/*  Pattern "filet de securite" : un MONMSG global (CPF0000) capture      */
+/*  TOUTE erreur non prevue, RCVMSG recupere l'identifiant ET le texte    */
+/*  du message du job, et on journalise avant de propager / sortir.       */
+/*                                                                        */
+/*  Ici on passe ERR_DESC explicitement (le &MSGTXT remonte par RCVMSG)  */
+/*  -> pas d'appel a QMHRTVM cote API, c'est le plus economique.          */
+/*                                                                        */
+/*  Compilation : CRTBNDCL PGM(JRNLIB/EXMONMSG2) SRCFILE(JRNLIB/QCLSRC)   */
+/* ===================================================================== */
+             PGM
+
+             DCL        VAR(&ERRCODE) TYPE(*CHAR) LEN(7)
+             DCL        VAR(&ERRTYPE) TYPE(*CHAR) LEN(3)   VALUE('CPF')
+             DCL        VAR(&PGM)     TYPE(*CHAR) LEN(10)  VALUE('EXMONMSG2')
+             DCL        VAR(&MSGTXT)  TYPE(*CHAR) LEN(100)
+             DCL        VAR(&MSGDTA)  TYPE(*CHAR) LEN(256)
+
+             /* --- Handler global : aucune erreur ne doit echapper ----- */
+             MONMSG     MSGID(CPF0000) EXEC(GOTO CMDLBL(ERREUR))
+
+             /* ============ TRAITEMENT NOMINAL ========================= */
+             /* Exemple d'instructions susceptibles d'echouer :           */
+             CHKOBJ     OBJ(JRNLIB/PARAM) OBJTYPE(*FILE)
+             OVRDBF     FILE(PARAM) TOFILE(JRNLIB/PARAM)
+             /* ... logique metier ...                                    */
+             CALL       PGM(TRAITEMENT)
+             /* ... fin du traitement nominal ...                         */
+
+             RETURN
+
+             /* ============ SECTION D'ERREUR =========================== */
+ ERREUR:     /* RCVMSG sans MSGTYPE -> dernier message recu par le pgm.   */
+             /*   &ERRCODE  = identifiant (CPFxxxx)                        */
+             /*   &MSGTXT   = texte de 1er niveau deja formate            */
+             RCVMSG     MSGTYPE(*LAST) MSGDTA(&MSGDTA) +
+                          MSG(&MSGTXT) MSGID(&ERRCODE)
+
+             CALL       PGM(WRTERRJRN) PARM(&ERRCODE +
+                          &ERRTYPE &PGM &MSGTXT)
+
+             /* On peut renvoyer l'incident au demandeur ou sortir.       */
+             /* Exemple : escalade en *ESCAPE vers l'appelant.            */
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) +
+                          MSGDTA('Incident journalise - voir ERR_JRN') +
+                          MSGTYPE(*ESCAPE)
+
+             ENDPGM

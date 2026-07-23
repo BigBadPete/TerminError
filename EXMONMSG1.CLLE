@@ -1,0 +1,34 @@
+/* ===================================================================== */
+/*  EXMONMSG1  -  Exemple 1 : MONMSG cible par commande                  */
+/* --------------------------------------------------------------------- */
+/*  Pattern "surveillance ponctuelle" : on intercepte un CPF precis sur  */
+/*  une commande donnee et on alimente le journal ERR_JRN via WRTERRJRN.  */
+/*                                                                        */
+/*  Compilation : CRTBNDCL PGM(JRNLIB/EXMONMSG1) SRCFILE(JRNLIB/QCLSRC)   */
+/*                                                                        */
+/*  Regle d'or CL : on ne passe JAMAIS de litteral a un CALL vers un *PGM */
+/*  (probleme de longueur des constantes). On declare des variables aux   */
+/*  longueurs EXACTES attendues par l'API (7/3/10/100).                   */
+/* ===================================================================== */
+             PGM
+
+             DCL        VAR(&ERRCODE) TYPE(*CHAR) LEN(7)
+             DCL        VAR(&ERRTYPE) TYPE(*CHAR) LEN(3)  VALUE('CPF')
+             DCL        VAR(&PGM)     TYPE(*CHAR) LEN(10) VALUE('EXMONMSG1')
+
+             /* --- Traitement nominal : suppression d'un fichier ------- */
+             /* Si le fichier n'existe pas, DLTF leve CPF2105.            */
+             DLTF       FILE(QTEMP/TRAVAIL)
+             MONMSG     MSGID(CPF2105) EXEC(DO)
+                          CHGVAR  VAR(&ERRCODE) VALUE('CPF2105')
+                          /* ERR_DESC omis volontairement :              */
+                          /* l'API ira chercher le libelle dans QCPFMSG. */
+                          CALL    PGM(WRTERRJRN) PARM(&ERRCODE +
+                                    &ERRTYPE &PGM)
+                        ENDDO
+
+             /* --- Suite du traitement (le fichier est absent) --------- */
+             /* ... logique metier ...                                    */
+
+             RETURN
+             ENDPGM
